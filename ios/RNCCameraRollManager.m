@@ -26,15 +26,23 @@
 @implementation RCTConvert (PHAssetCollectionSubtype)
 
 RCT_ENUM_CONVERTER(PHAssetCollectionSubtype, (@{
-   @"album": @(PHAssetCollectionSubtypeAny),
-   @"all": @(PHAssetCollectionSubtypeSmartAlbumUserLibrary),
-   @"event": @(PHAssetCollectionSubtypeAlbumSyncedEvent),
-   @"faces": @(PHAssetCollectionSubtypeAlbumSyncedFaces),
-   @"library": @(PHAssetCollectionSubtypeSmartAlbumUserLibrary),
-   @"photo-stream": @(PHAssetCollectionSubtypeAlbumMyPhotoStream), // incorrect, but legacy
-   @"photostream": @(PHAssetCollectionSubtypeAlbumMyPhotoStream),
-   @"saved-photos": @(PHAssetCollectionSubtypeAny), // incorrect, but legacy correspondence in PHAssetCollectionSubtype
-   @"savedphotos": @(PHAssetCollectionSubtypeAny), // This was ALAssetsGroupSavedPhotos, seems to have no direct correspondence in PHAssetCollectionSubtype
+  @"album": @(PHAssetCollectionSubtypeAny),
+  @"all": @(PHAssetCollectionSubtypeSmartAlbumUserLibrary),
+  @"event": @(PHAssetCollectionSubtypeAlbumSyncedEvent),
+  @"faces": @(PHAssetCollectionSubtypeAlbumSyncedFaces),
+  @"library": @(PHAssetCollectionSubtypeSmartAlbumUserLibrary),
+  @"photo-stream": @(PHAssetCollectionSubtypeAlbumMyPhotoStream), // incorrect, but legacy
+  @"photostream": @(PHAssetCollectionSubtypeAlbumMyPhotoStream),
+  @"saved-photos": @(PHAssetCollectionSubtypeAny), // incorrect, but legacy correspondence in PHAssetCollectionSubtype
+  @"savedphotos": @(PHAssetCollectionSubtypeAny), // This was ALAssetsGroupSavedPhotos, seems to have no direct correspondence in PHAssetCollectionSubtype
+  @"favorites": @(PHAssetCollectionSubtypeSmartAlbumFavorites),
+  @"panoramas": @(PHAssetCollectionSubtypeSmartAlbumPanoramas),
+  @"bursts": @(PHAssetCollectionSubtypeSmartAlbumBursts),
+  @"selfies": @(PHAssetCollectionSubtypeSmartAlbumSelfPortraits),
+  @"portrait": @(PHAssetCollectionSubtypeSmartAlbumDepthEffect),
+  @"recents": @(PHAssetCollectionSubtypeSmartAlbumRecentlyAdded),
+  @"screenshots": @(PHAssetCollectionSubtypeSmartAlbumScreenshots),
+  @"livephotos": @(PHAssetCollectionSubtypeSmartAlbumLivePhotos),
 }), PHAssetCollectionSubtypeAny, integerValue)
 
 
@@ -229,10 +237,13 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
   
   // If groupTypes is "all", we want to fetch the SmartAlbum "all photos". Otherwise, all
   // other groupTypes values require the "album" collection type.
-  PHAssetCollectionType const collectionType = ([groupTypes isEqualToString:@"all"]
+  PHAssetCollectionType const collectionType = ([groupTypes isEqualToString:@"all"] || [groupTypes isEqualToString:@"library"]
                                                 ? PHAssetCollectionTypeSmartAlbum
                                                 : PHAssetCollectionTypeAlbum);
-  PHAssetCollectionSubtype const collectionSubtype = [RCTConvert PHAssetCollectionSubtype:groupTypes];
+  
+  PHAssetCollectionSubtype const collectionSubtype = [RCTConvert PHAssetCollectionSubtype:[groupTypes isEqualToString:@"library"]
+                                                      ? [groupName lowercaseString]
+                                                      : groupTypes];
   
   // Predicate for fetching assets within a collection
   PHFetchOptions *const assetFetchOptions = [RCTConvert PHFetchOptionsFromMediaType:mediaType];
@@ -246,8 +257,8 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
   // Filter collection name ("group")
   PHFetchOptions *const collectionFetchOptions = [PHFetchOptions new];
   collectionFetchOptions.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"endDate" ascending:NO]];
-  if (groupName != nil) {
-    collectionFetchOptions.predicate = [NSPredicate predicateWithFormat:[NSString stringWithFormat:@"localizedTitle == '%@'", groupName]];
+  if (groupName != nil && ![groupTypes isEqualToString:@"library"]) {
+    collectionFetchOptions.predicate = [NSPredicate predicateWithFormat:@"localizedTitle == %@", groupName];
   }
   
   BOOL __block stopCollections_;
@@ -345,6 +356,7 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
       [assetFetchResult enumerateObjectsUsingBlock:collectAsset];
     } else {
       PHFetchResult<PHAssetCollection *> *const assetCollectionFetchResult = [PHAssetCollection fetchAssetCollectionsWithType:collectionType subtype:collectionSubtype options:collectionFetchOptions];
+      
       [assetCollectionFetchResult enumerateObjectsUsingBlock:^(PHAssetCollection * _Nonnull assetCollection, NSUInteger collectionIdx, BOOL * _Nonnull stopCollections) {
         // Enumerate assets within the collection
         PHFetchResult<PHAsset *> *const assetsFetchResult = [PHAsset fetchAssetsInAssetCollection:assetCollection options:assetFetchOptions];
