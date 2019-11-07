@@ -267,6 +267,7 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
   requestPhotoLibraryAccess(reject, ^{
     void (^collectAsset)(PHAsset*, NSUInteger, BOOL*) = ^(PHAsset * _Nonnull asset, NSUInteger assetIdx, BOOL * _Nonnull stopAssets) {
       NSString *const uri = [NSString stringWithFormat:@"ph://%@", [asset localIdentifier]];
+        
       if (afterCursor && !foundAfter) {
         if ([afterCursor isEqualToString:uri]) {
           foundAfter = YES;
@@ -326,28 +327,45 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
       // would definitely utilize the disk too much.
       // Thus, this field is actually not reliable.
       // Note that Android also does not return the `isStored` field at all.
-      [assets addObject:@{
-        @"node": @{
-          @"type": assetMediaTypeLabel, // TODO: switch to mimeType?
-          @"group_name": currentCollectionName,
-          @"image": @{
-              @"uri": uri,
-              @"filename": origFilename,
-              @"height": @([asset pixelHeight]),
-              @"width": @([asset pixelWidth]),
-              @"isStored": @YES, // this field doesn't seem to exist on android
-              @"playableDuration": @([asset duration]) // fractional seconds
-          },
-          @"timestamp": @(asset.creationDate.timeIntervalSince1970),
-          @"location": (loc ? @{
-              @"latitude": @(loc.coordinate.latitude),
-              @"longitude": @(loc.coordinate.longitude),
-              @"altitude": @(loc.altitude),
-              @"heading": @(loc.course),
-              @"speed": @(loc.speed), // speed in m/s
-            } : @{})
-          }
+      PHImageRequestOptions *options = [[PHImageRequestOptions alloc] init];
+      options.deliveryMode = PHImageRequestOptionsDeliveryModeOpportunistic;
+      options.resizeMode = PHImageRequestOptionsResizeModeFast;
+      options.synchronous = true;
+        
+      [[PHImageManager defaultManager]
+       requestImageForAsset:asset
+                 targetSize:CGSizeMake(300, 300)
+                contentMode:PHImageContentModeAspectFill
+                    options:options
+              resultHandler:^(UIImage * _Nullable result, NSDictionary * _Nullable info) {
+          NSData *imageData = UIImageJPEGRepresentation(result, 1.0);
+          NSString *base64Encoded = [imageData base64EncodedStringWithOptions:0];
+      
+          [assets addObject:@{
+            @"node": @{
+              @"type": assetMediaTypeLabel, // TODO: switch to mimeType?
+              @"group_name": currentCollectionName,
+              @"image": @{
+                  @"uri": uri,
+                  @"thumbnail": base64Encoded,
+                  @"filename": origFilename,
+                  @"height": @([asset pixelHeight]),
+                  @"width": @([asset pixelWidth]),
+                  @"isStored": @YES, // this field doesn't seem to exist on android
+                  @"playableDuration": @([asset duration]) // fractional seconds
+              },
+              @"timestamp": @(asset.creationDate.timeIntervalSince1970),
+              @"location": (loc ? @{
+                  @"latitude": @(loc.coordinate.latitude),
+                  @"longitude": @(loc.coordinate.longitude),
+                  @"altitude": @(loc.altitude),
+                  @"heading": @(loc.course),
+                  @"speed": @(loc.speed), // speed in m/s
+                } : @{})
+              }
+          }];
       }];
+
     };
 
     if ([groupTypes isEqualToString:@"all"]) {
@@ -406,3 +424,4 @@ static void checkPhotoLibraryConfig()
 }
 
 @end
+
