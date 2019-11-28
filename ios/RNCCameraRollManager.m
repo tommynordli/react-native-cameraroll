@@ -331,6 +331,8 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
       options.deliveryMode = PHImageRequestOptionsDeliveryModeOpportunistic;
       options.resizeMode = PHImageRequestOptionsResizeModeFast;
       options.synchronous = true;
+    
+      __block NSString *base64Encoded = @"";
         
       [[PHImageManager defaultManager]
        requestImageForAsset:asset
@@ -338,32 +340,34 @@ RCT_EXPORT_METHOD(getPhotos:(NSDictionary *)params
                 contentMode:PHImageContentModeAspectFill
                     options:options
               resultHandler:^(UIImage * _Nullable result, NSDictionary * _Nullable info) {
-          NSData *imageData = UIImageJPEGRepresentation(result, 1.0);
-          NSString *base64Encoded = [imageData base64EncodedStringWithOptions:0];
-      
-          [assets addObject:@{
-            @"node": @{
-              @"type": assetMediaTypeLabel, // TODO: switch to mimeType?
-              @"group_name": currentCollectionName,
-              @"image": @{
-                  @"uri": uri,
-                  @"thumbnail": base64Encoded,
-                  @"filename": origFilename,
-                  @"height": @([asset pixelHeight]),
-                  @"width": @([asset pixelWidth]),
-                  @"isStored": @YES, // this field doesn't seem to exist on android
-                  @"playableDuration": @([asset duration]) // fractional seconds
-              },
-              @"timestamp": @(asset.creationDate.timeIntervalSince1970),
-              @"location": (loc ? @{
-                  @"latitude": @(loc.coordinate.latitude),
-                  @"longitude": @(loc.coordinate.longitude),
-                  @"altitude": @(loc.altitude),
-                  @"heading": @(loc.course),
-                  @"speed": @(loc.speed), // speed in m/s
-                } : @{})
-              }
-          }];
+          if (result != nil) {
+              NSData *imageData = UIImageJPEGRepresentation(result, 1.0);
+              base64Encoded = [imageData base64EncodedStringWithOptions:0];
+          }
+      }];
+        
+      [assets addObject:@{
+        @"node": @{
+          @"type": assetMediaTypeLabel, // TODO: switch to mimeType?
+          @"group_name": currentCollectionName,
+          @"image": @{
+              @"uri": uri,
+              @"thumbnail": base64Encoded,
+              @"filename": origFilename,
+              @"height": @([asset pixelHeight]),
+              @"width": @([asset pixelWidth]),
+              @"isStored": @YES, // this field doesn't seem to exist on android
+              @"playableDuration": @([asset duration]) // fractional seconds
+          },
+          @"timestamp": @(asset.creationDate.timeIntervalSince1970),
+          @"location": (loc ? @{
+              @"latitude": @(loc.coordinate.latitude),
+              @"longitude": @(loc.coordinate.longitude),
+              @"altitude": @(loc.altitude),
+              @"heading": @(loc.course),
+              @"speed": @(loc.speed), // speed in m/s
+            } : @{})
+          }
       }];
 
     };
